@@ -58,7 +58,6 @@ function usePersist(key, initial) {
 const COLORS = ["#6366f1","#f59e0b","#10b981","#ef4444","#3b82f6","#8b5cf6","#ec4899","#14b8a6"];
 const CATEGORY_ICONS = {"Exam / Certification":"🎯","University / School":"🎓","Language Learning":"🌍","Other":"📚"};
 const RESOURCE_TYPES = {"Book":"📖","Video Course":"🎬","Article / PDF":"📄","Podcast":"🎧","Website":"🌐","Other":"📦"};
-const PRIORITY_COLORS = {"High":"#ef4444","Medium":"#f59e0b","Low":"#10b981"};
 
 const defaultSubjects = [
   {id:1,name:"Mathematics",category:"University / School",color:COLORS[0],goal:60},
@@ -167,7 +166,6 @@ function StudyPlanner() {
   const [sessions,setSessions] = usePersist("sf_sessions", []);
   const [flashcards,setFlashcards] = usePersist("sf_flashcards", []);
   const [resources,setResources] = usePersist("sf_resources", defaultResources);
-  const [tasks,setTasks] = usePersist("sf_tasks", []);
   const [tab,setTab] = useState("dashboard");
 
   const [pomActive,setPomActive]=useState(false);
@@ -220,7 +218,6 @@ function StudyPlanner() {
   const todaySess=()=>sessions.filter(s=>s.date===today());
   const todayMin=sid=>todaySess().filter(s=>!sid||s.subjectId===sid).reduce((a,s)=>a+s.minutes,0);
   const weekMin=sid=>{const w=getWeekDates();return sessions.filter(s=>w.includes(s.date)&&(!sid||s.subjectId===sid)).reduce((a,s)=>a+s.minutes,0);};
-  const todayTasks=()=>tasks.filter(t=>!t.date||t.date===today());
 
   function startReview(filter="all"){
     let pool=buildSmartDeck(flashcards);
@@ -238,7 +235,6 @@ function StudyPlanner() {
   const addSubject=()=>{if(!form.name)return;setSubjects(s=>[...s,{id:Date.now(),name:form.name,category:form.category||"Other",color:form.color||COLORS[s.length%COLORS.length],goal:parseInt(form.goal)||60}]);setModal(null);setForm({});};
   const addCard=()=>{if(!form.front||!form.back)return;setFlashcards(fc=>[...fc,{id:Date.now(),subjectId:form.subjectId?parseInt(form.subjectId):null,front:form.front,back:form.back,due:today(),reps:0,interval:0,ef:2.5,againStreak:0,isLeech:false}]);setModal(null);setForm({});};
   const addSession=()=>{if(!form.subjectId||!form.minutes)return;setSessions(ss=>[{id:Date.now(),subjectId:parseInt(form.subjectId),date:form.date||today(),minutes:parseInt(form.minutes),note:form.note||""},...ss]);setModal(null);setForm({});};
-  const addTask=()=>{if(!form.taskName)return;setTasks(ts=>[...ts,{id:Date.now(),name:form.taskName,date:form.taskDate||today(),priority:form.priority||"Medium",subjectId:form.taskSubject?parseInt(form.taskSubject):null,done:false}]);setModal(null);setForm({});};
   const addResource=()=>{if(!form.title)return;setResources(r=>[...r,{id:Date.now(),subjectId:form.subjectId?parseInt(form.subjectId):null,title:form.title,type:form.type||"Book",author:form.author||"",color:form.color||COLORS[r.length%COLORS.length],sections:[]}]);setModal(null);setForm({});};
 
   const addSection=(resId,name)=>{if(!name.trim())return;setResources(rs=>updateInTree(rs,resId,r=>({...r,sections:[...r.sections,{id:Date.now(),name,chapters:[]}]})));};
@@ -251,8 +247,6 @@ function StudyPlanner() {
   const addSubtopic=(resId,secId,chId,tpId,name)=>{if(!name.trim())return;setResources(rs=>updateInTree(rs,resId,r=>({...r,sections:r.sections.map(s=>s.id===secId?{...s,chapters:s.chapters.map(c=>c.id===chId?{...c,topics:c.topics.map(t=>t.id===tpId?{...t,subtopics:[...t.subtopics,{id:Date.now(),name,done:false}]}:t)}:c)}:s)})));};
   const toggleSubtopic=(resId,secId,chId,tpId,stId)=>setResources(rs=>updateInTree(rs,resId,r=>({...r,sections:r.sections.map(s=>s.id===secId?{...s,chapters:s.chapters.map(c=>c.id===chId?{...c,topics:c.topics.map(t=>t.id===tpId?{...t,subtopics:t.subtopics.map(st=>st.id===stId?{...st,done:!st.done}:st)}:t)}:c)}:s)})));
   const deleteSubtopic=(resId,secId,chId,tpId,stId)=>setResources(rs=>updateInTree(rs,resId,r=>({...r,sections:r.sections.map(s=>s.id===secId?{...s,chapters:s.chapters.map(c=>c.id===chId?{...c,topics:c.topics.map(t=>t.id===tpId?{...t,subtopics:t.subtopics.filter(st=>st.id!==stId)}:t)}:c)}:s)})));
-  const toggleTask=id=>setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t));
-  const deleteTask=id=>setTasks(ts=>ts.filter(t=>t.id!==id));
   const clearLeech=id=>setFlashcards(fc=>fc.map(c=>c.id===id?{...c,isLeech:false,againStreak:0}:c));
 
   const weekDates=getWeekDates();
@@ -287,13 +281,12 @@ function StudyPlanner() {
           <span style={{background:"rgba(99,102,241,.2)",borderRadius:20,padding:"3px 9px",fontSize:11,color:"#a5b4fc"}}>📅 {new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}</span>
           {stats.due>0&&<span onClick={()=>{setTab("flashcards");startReview();}} style={{background:"#dc2626",borderRadius:20,padding:"3px 9px",fontSize:11,color:"#fff",cursor:"pointer"}}>🃏 {stats.due}</span>}
           {stats.leeches>0&&<span onClick={()=>{setTab("flashcards");startReview("leech");}} style={{background:"#7c3aed",borderRadius:20,padding:"3px 9px",fontSize:11,color:"#fff",cursor:"pointer"}}>⚠️ {stats.leeches}</span>}
-          {todayTasks().filter(t=>!t.done).length>0&&<span onClick={()=>setTab("tasks")} style={{background:"#f59e0b",borderRadius:20,padding:"3px 9px",fontSize:11,color:"#fff",cursor:"pointer"}}>✅ {todayTasks().filter(t=>!t.done).length}</span>}
         </div>
       </div>
 
       {/* NAV */}
       <div style={{display:"flex",gap:2,padding:"5px 10px",background:"#13131f",borderBottom:"1px solid #1e1e3f",overflowX:"auto",position:"sticky",top:56,zIndex:99}}>
-        {[["dashboard","📊","Dashboard"],["tasks","✅","Tasks"],["resources","📖","Resources"],["flashcards","🃏","Cards"],["pomodoro","⏱️","Timer"],["subjects","📚","Subjects"],["sessions","📝","Sessions"],["progress","📈","Progress"]].map(([id,icon,label])=>(
+        {[["dashboard","📊","Dashboard"],["resources","📖","Resources"],["flashcards","🃏","Cards"],["pomodoro","⏱️","Timer"],["subjects","📚","Subjects"],["sessions","📝","Sessions"],["progress","📈","Progress"]].map(([id,icon,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{padding:"6px 10px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:500,whiteSpace:"nowrap",background:tab===id?"linear-gradient(135deg,#4f46e5,#7c3aed)":"transparent",color:tab===id?"#fff":"#94a3b8",transition:"all .15s",flexShrink:0}}>{icon} {label}</button>
         ))}
       </div>
@@ -304,7 +297,7 @@ function StudyPlanner() {
         {tab==="dashboard"&&<div>
           <h2 style={{margin:"0 0 12px",color:"#c7d2fe",fontSize:16}}>Good {greet}! 👋</h2>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(135px,1fr))",gap:8,marginBottom:14}}>
-            {[{l:"Today's Study",v:formatMin(todayMin()),i:"⏱️",c:"#6366f1"},{l:"Cards Due",v:stats.due,i:"🃏",c:stats.due>0?"#ef4444":"#10b981"},{l:"Tasks Today",v:`${todayTasks().filter(t=>t.done).length}/${todayTasks().length}`,i:"✅",c:"#f59e0b"},{l:"Leeches",v:stats.leeches,i:"⚠️",c:stats.leeches>0?"#7c3aed":"#10b981"}].map(s=>(
+            {[{l:"Today's Study",v:formatMin(todayMin()),i:"⏱️",c:"#6366f1"},{l:"Cards Due",v:stats.due,i:"🃏",c:stats.due>0?"#ef4444":"#10b981"},{l:"Leeches",v:stats.leeches,i:"⚠️",c:stats.leeches>0?"#7c3aed":"#10b981"}].map(s=>(
               <div key={s.l} style={card({border:`1px solid ${s.c}22`})}>
                 <div style={{fontSize:18,marginBottom:2}}>{s.i}</div>
                 <div style={{fontSize:20,fontWeight:700,color:s.c}}>{s.v}</div>
@@ -337,19 +330,6 @@ function StudyPlanner() {
               })}
             </div>
           </div>
-          {todayTasks().length>0&&<div style={card({marginBottom:12})}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <span style={{fontWeight:600,color:"#a5b4fc",fontSize:12}}>📋 Today's Tasks</span>
-              <button onClick={()=>setTab("tasks")} style={iconBtn({color:"#6366f1",fontSize:11})}>View all →</button>
-            </div>
-            {todayTasks().slice(0,4).map(t=>{const sub=subjects.find(x=>x.id===t.subjectId);return(
-              <div key={t.id} onClick={()=>toggleTask(t.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:"1px solid #1e1e3f20",cursor:"pointer"}}>
-                <div style={{width:15,height:15,borderRadius:4,border:`2px solid ${PRIORITY_COLORS[t.priority]||"#6366f1"}`,background:t.done?PRIORITY_COLORS[t.priority]||"#6366f1":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{t.done&&<span style={{fontSize:8,color:"#fff",fontWeight:700}}>✓</span>}</div>
-                <span style={{fontSize:12,flex:1,textDecoration:t.done?"line-through":"none",color:t.done?"#475569":"#e2e8f0"}}>{t.name}</span>
-                {sub&&<span style={{fontSize:10,color:sub.color}}>{sub.name}</span>}
-              </div>
-            );})}
-          </div>}
           <div style={{display:"grid",gap:7,marginBottom:12}}>
             {subjects.map(sub=>{const done=todayMin(sub.id),goal=sub.goal||60,pct=Math.min(100,Math.round(done/goal*100));return(
               <div key={sub.id} style={card()}>
@@ -363,47 +343,8 @@ function StudyPlanner() {
           </div>
           <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
             <button onClick={()=>setTab("pomodoro")} style={btnStyle("#4f46e5")}>▶ Pomodoro</button>
-            <button onClick={()=>{setModal("addTask");setForm({taskDate:today(),priority:"Medium"});}} style={btnStyle("#f59e0b")}>+ Task</button>
             <button onClick={()=>{setModal("addSession");setForm({date:today()});}} style={btnStyle("#059669")}>+ Session</button>
           </div>
-        </div>}
-
-        {/* ══ TASKS ══ */}
-        {tab==="tasks"&&<div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <h2 style={{margin:0,color:"#c7d2fe",fontSize:16}}>✅ Daily Tasks</h2>
-            <button onClick={()=>{setModal("addTask");setForm({taskDate:today(),priority:"Medium"});}} style={btnStyle("#f59e0b")}>+ Add Task</button>
-          </div>
-          {["Today","Upcoming","Past"].map(section=>{
-            const filtered=tasks.filter(t=>{if(section==="Today")return !t.date||t.date===today();if(section==="Upcoming")return t.date&&t.date>today();return t.date&&t.date<today();});
-            if(!filtered.length&&section==="Past")return null;
-            const done=filtered.filter(t=>t.done).length;
-            return(<div key={section} style={{marginBottom:14}}>
-              <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}>
-                <span style={{fontSize:12,fontWeight:600,color:section==="Today"?"#a5b4fc":section==="Upcoming"?"#10b981":"#64748b"}}>{section==="Today"?"📋":section==="Upcoming"?"📅":"🗂"} {section}</span>
-                <span style={{fontSize:10,color:"#475569"}}>{done}/{filtered.length}</span>
-                {filtered.length>0&&<div style={{flex:1,background:"#1e1e3f",borderRadius:99,height:3,overflow:"hidden"}}><div style={{width:`${Math.round(done/filtered.length*100)}%`,height:"100%",background:section==="Today"?"#6366f1":"#10b981",borderRadius:99}}/></div>}
-              </div>
-              <div style={{display:"grid",gap:6}}>
-                {filtered.sort((a,b)=>a.done-b.done).map(t=>{const sub=subjects.find(x=>x.id===t.subjectId),pc=PRIORITY_COLORS[t.priority]||"#6366f1";return(
-                  <div key={t.id} style={{...card({border:`1px solid ${t.done?"#1e1e3f":pc+"28"}`,opacity:t.done?.7:1}),display:"flex",alignItems:"center",gap:9}}>
-                    <div onClick={()=>toggleTask(t.id)} style={{width:17,height:17,borderRadius:5,border:`2px solid ${pc}`,background:t.done?pc:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>{t.done&&<span style={{fontSize:9,color:"#fff",fontWeight:700}}>✓</span>}</div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:500,textDecoration:t.done?"line-through":"none",color:t.done?"#475569":"#e2e8f0"}}>{t.name}</div>
-                      <div style={{display:"flex",gap:6,marginTop:2}}>
-                        <span style={{fontSize:9,color:pc,background:`${pc}18`,borderRadius:3,padding:"1px 5px"}}>{t.priority}</span>
-                        {sub&&<span style={{fontSize:9,color:sub.color}}>{sub.name}</span>}
-                        {t.date&&t.date!==today()&&<span style={{fontSize:9,color:"#64748b"}}>{t.date}</span>}
-                      </div>
-                    </div>
-                    <button onClick={()=>deleteTask(t.id)} style={iconBtn()}>✕</button>
-                  </div>
-                );})}
-                {!filtered.length&&<div style={{color:"#475569",fontSize:12,textAlign:"center",padding:10}}>No {section.toLowerCase()} tasks</div>}
-              </div>
-            </div>);
-          })}
-          {!tasks.length&&<div style={{color:"#475569",textAlign:"center",padding:40}}>No tasks yet. Add your first one! ✅</div>}
         </div>}
 
         {/* ══ RESOURCES ══ */}
@@ -706,7 +647,7 @@ function StudyPlanner() {
             </div>):null;})}
           </div>}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:7}}>
-            {[{l:"Sessions",v:sessions.length,i:"📝"},{l:"Study Time",v:formatMin(sessions.reduce((a,s)=>a+s.minutes,0)),i:"⏱️"},{l:"Flashcards",v:flashcards.length,i:"🃏"},{l:"Resources",v:resources.length,i:"📖"},{l:"Tasks Done",v:tasks.filter(t=>t.done).length,i:"✅"},{l:"Subjects",v:subjects.length,i:"📚"}].map(s=>(
+            {[{l:"Sessions",v:sessions.length,i:"📝"},{l:"Study Time",v:formatMin(sessions.reduce((a,s)=>a+s.minutes,0)),i:"⏱️"},{l:"Flashcards",v:flashcards.length,i:"🃏"},{l:"Resources",v:resources.length,i:"📖"},{l:"Subjects",v:subjects.length,i:"📚"}].map(s=>(
               <div key={s.l} style={card({textAlign:"center"})}><div style={{fontSize:17}}>{s.i}</div><div style={{fontSize:16,fontWeight:700,color:"#c7d2fe",margin:"2px 0"}}>{s.v}</div><div style={{fontSize:9,color:"#64748b"}}>{s.l}</div></div>
             ))}
           </div>
@@ -733,15 +674,6 @@ function StudyPlanner() {
             <label style={labelStyle}>Subject</label><select value={form.subjectId||""} onChange={e=>setForm(f=>({...f,subjectId:e.target.value}))} style={inputStyle()}><option value="">— None —</option>{subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
             <label style={labelStyle}>Color</label><div style={{display:"flex",gap:6,marginBottom:12}}>{COLORS.map(c=><div key={c} onClick={()=>setForm(f=>({...f,color:c}))} style={{width:20,height:20,borderRadius:"50%",background:c,cursor:"pointer",border:form.color===c?"3px solid #fff":"3px solid transparent"}}/>)}</div>
             <div style={{display:"flex",gap:7}}><button onClick={addResource} style={btnStyle("#4f46e5",{flex:1})}>Add</button><button onClick={()=>setModal(null)} style={btnStyle("#475569",{flex:1})}>Cancel</button></div>
-          </>}
-          {modal==="addTask"&&<>
-            <h3 style={{margin:"0 0 12px",color:"#c7d2fe"}}>Add Task</h3>
-            <label style={labelStyle}>Task</label><input placeholder="e.g. Complete Chapter 3" value={form.taskName||""} onChange={e=>setForm(f=>({...f,taskName:e.target.value}))} style={inputStyle()}/>
-            <label style={labelStyle}>Date</label><input type="date" value={form.taskDate||today()} onChange={e=>setForm(f=>({...f,taskDate:e.target.value}))} style={inputStyle()}/>
-            <label style={labelStyle}>Priority</label>
-            <div style={{display:"flex",gap:6,marginBottom:12}}>{["High","Medium","Low"].map(p=><button key={p} onClick={()=>setForm(f=>({...f,priority:p}))} style={{flex:1,padding:"6px",borderRadius:7,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:form.priority===p?PRIORITY_COLORS[p]:"#0f0f1a",color:form.priority===p?"#fff":PRIORITY_COLORS[p]}}>{p}</button>)}</div>
-            <label style={labelStyle}>Subject</label><select value={form.taskSubject||""} onChange={e=>setForm(f=>({...f,taskSubject:e.target.value}))} style={inputStyle()}><option value="">— None —</option>{subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
-            <div style={{display:"flex",gap:7}}><button onClick={addTask} style={btnStyle("#f59e0b",{flex:1})}>Add Task</button><button onClick={()=>setModal(null)} style={btnStyle("#475569",{flex:1})}>Cancel</button></div>
           </>}
           {modal==="addCard"&&<>
             <h3 style={{margin:"0 0 12px",color:"#c7d2fe"}}>Add Flashcard</h3>
